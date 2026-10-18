@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Audio Player — 軽量ローカル音声プレイヤー</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app" class="app-layout">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Local Audio <span>Player</span></h1>
+          <p class="subtitle">Lightweight Audio Player for Drills & Listening</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Hidden file input for folder selection -->
+        <input type="file" id="folderInput" webkitdirectory directory multiple accept="audio/*,.mp3" class="hidden-input">
+        
+        <button id="openFolderBtn" class="btn btn-primary" title="音声ファイルがあるフォルダを選択してください">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span id="folderBtnText">音声フォルダを開く</span>
+        </button>
+
+        <div id="loadedBadge" class="badge-status hidden">
+          <span class="pulse-dot"></span>
+          <span id="loadedCount">0 曲 読み込み完了</span>
+        </div>
+
+        <button id="helpBtn" class="btn btn-ghost btn-icon" title="使い方・ショートカット">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-container">
+      <!-- Empty State / Drop Overlay (Shown before folder is loaded) -->
+      <section id="dropZone" class="drop-zone">
+        <div class="drop-content">
+          <div class="drop-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+              <path d="M12 12v9"></path>
+              <path d="m16 16-4-4-4 4"></path>
+            </svg>
+          </div>
+          <h2>音声フォルダを選択してください</h2>
+          <p class="drop-instruction">
+            「<strong>音声フォルダを開く</strong>」ボタンを押すか、<br>
+            音声ファイル（.mp3 など）が入ったフォルダをここにドラッグ＆ドロップしてください。
+          </p>
+          <div class="default-path-hint">
+            <span class="hint-label">フォルダ例:</span>
+            <code>Eigo_no_Hanon2 や 学習教材の音声フォルダ</code>
+          </div>
+          <button id="browseBtn" class="btn btn-primary btn-lg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            フォルダを選択する
+          </button>
+        </div>
+      </section>
+
+      <!-- Active Content (Hidden until files loaded) -->
+      <section id="contentArea" class="content-area hidden">
+        <!-- Left Panel: All Tracks by Unit -->
+        <div class="panel track-list-panel">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <h2>トラック一覧</h2>
+              <span id="totalTracksLabel" class="counter-pill">0 曲</span>
+            </div>
+            
+            <div class="search-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="trackSearch" placeholder="トラックやグループを検索...">
+            </div>
+          </div>
+
+          <!-- Selection Action Toolbar -->
+          <div class="selection-toolbar">
+            <div class="toolbar-left">
+              <button id="selectAllBtn" class="btn btn-sm btn-ghost">すべて選択</button>
+              <button id="deselectAllBtn" class="btn btn-sm btn-ghost">全解除</button>
+              <button id="toggleExpandAllBtn" class="btn btn-sm btn-ghost">すべて展開</button>
+            </div>
+            <div class="toolbar-right">
+              <button id="queueSelectedBtn" class="btn btn-sm btn-accent">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span>選択曲を再生キューに追加</span>
+                <span id="selectedCountBadge" class="pill-badge">0</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Unit Groups Container -->
+          <div id="unitGroupsContainer" class="unit-groups-container">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <!-- Right Panel: Play Queue & Sequence -->
+        <div class="panel queue-panel">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <h2>再生キュー (順番再生)</h2>
+              <span id="queueCounter" class="counter-pill">0 曲</span>
+            </div>
+            <div class="queue-actions">
+              <button id="clearQueueBtn" class="btn btn-sm btn-ghost" title="キューを空にする">クリア</button>
+            </div>
+          </div>
+
+          <div class="queue-mode-bar">
+            <div class="queue-info">
+              <span id="queueStatusText">キューが空です。左の一覧から曲を選択してください。</span>
+            </div>
+          </div>
+
+          <!-- Queue List -->
+          <div id="queueListContainer" class="queue-list-container">
+            <!-- Dynamically populated via JS -->
+            <div class="empty-queue-message">
+              <p>左側のトラック一覧で曲にチェックを入れて、<br>「選択曲を再生キューに追加」を押してください。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Audio Player Dock -->
+    <footer id="playerDock" class="player-dock">
+      <!-- Hidden Native Audio Element -->
+      <audio id="audioElement" preload="auto"></audio>
+
+      <!-- Player Content Wrapper -->
+      <div class="player-grid">
+        <!-- 1. Track Info Section -->
+        <div class="player-track-info">
+          <div class="track-artwork">
+            <div class="artwork-waves" id="artWaves">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <svg id="artDefaultIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
+          <div class="track-meta">
+            <div id="nowPlayingTitle" class="track-title">再生待機中</div>
+            <div id="nowPlayingSubtitle" class="track-subtitle">曲を選択するかキューを再生してください</div>
+          </div>
+        </div>
+
+        <!-- 2. Controls & Seek Section -->
+        <div class="player-center">
+          <div class="player-controls">
+            <!-- Repeat Mode Button -->
+            <button id="repeatBtn" class="ctrl-btn" title="リピート切り替え (なし / 全曲ループ / 1曲リピート)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="17 1 21 5 17 9"></polyline>
+                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                <polyline points="7 23 3 19 7 15"></polyline>
+                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+              </svg>
+              <span id="repeatIndicator" class="repeat-tag">OFF</span>
+            </button>
+
+            <!-- Previous Track -->
+            <button id="prevBtn" class="ctrl-btn" title="前の曲へ">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                <line x1="5" y1="19" x2="5" y2="5"></line>
+              </svg>
+            </button>
+
+            <!-- Skip Backward 5s -->
+            <button id="skipBackBtn" class="ctrl-btn skip-btn" title="5秒戻る (ハノンの繰り返し練習に便利)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 4v6h6"></path>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+              <span class="skip-label">5s</span>
+            </button>
+
+            <!-- Play / Pause Main Button -->
+            <button id="playPauseBtn" class="ctrl-btn play-main-btn" title="再生 / 一時停止 (Space)">
+              <svg id="playIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <svg id="pauseIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="hidden">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+              </svg>
+            </button>
+
+            <!-- Skip Forward 5s -->
+            <button id="skipFwdBtn" class="ctrl-btn skip-btn" title="5秒進む">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6"></path>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+              <span class="skip-label">5s</span>
+            </button>
+
+            <!-- Next Track -->
+            <button id="nextBtn" class="ctrl-btn" title="次の曲へ">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                <line x1="19" y1="5" x2="19" y2="19"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Seekbar and Time Display -->
+          <div class="player-timeline">
+            <span id="currentTimeLabel" class="time-label">0:00</span>
+            <div class="progress-bar-container" id="progressBarContainer">
+              <div id="progressBuffered" class="progress-buffered"></div>
+              <div id="progressBar" class="progress-fill"></div>
+              <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1" class="seek-slider">
+            </div>
+            <span id="totalTimeLabel" class="time-label">0:00</span>
+          </div>
+        </div>
+
+        <!-- 3. Audio Rate & Volume Controls -->
+        <div class="player-extra">
+          <!-- Playback Speed Picker -->
+          <div class="speed-control-wrapper">
+            <button id="speedBtn" class="speed-btn" title="再生速度を変更">1.0x</button>
+            <div id="speedMenu" class="speed-menu hidden">
+              <button data-speed="0.75">0.75x (ゆっくり)</button>
+              <button data-speed="0.85">0.85x</button>
+              <button data-speed="0.9">0.9x</button>
+              <button data-speed="1.0" class="active">1.0x (標準)</button>
+              <button data-speed="1.1">1.1x</button>
+              <button data-speed="1.25">1.25x (高速)</button>
+              <button data-speed="1.5">1.5x</button>
+            </div>
+          </div>
+
+          <!-- Volume Controls -->
+          <div class="volume-container">
+            <button id="volumeBtn" class="ctrl-btn btn-sm" title="ミュート切り替え">
+              <svg id="volHighIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              </svg>
+              <svg id="volMuteIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hidden">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <line x1="23" y1="9" x2="17" y2="15"></line>
+                <line x1="17" y1="9" x2="23" y2="15"></line>
+              </svg>
+            </button>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="volume-slider">
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Help Modal Dialog -->
+    <div id="helpModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Local Audio Player の使い方</h3>
+          <button id="closeHelpBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <section>
+            <h4>📖 基本的な使い方</h4>
+            <ol>
+              <li>「<strong>音声フォルダを開く</strong>」をクリックして音声フォルダを選択します（ドラッグ＆ドロップでも可）。</li>
+              <li>左側のトラック一覧から、再生したい曲にチェックを入れます（グループ単位の一括選択も可能）。</li>
+              <li>「<strong>選択曲を再生キューに追加</strong>」を押すと、指定した順番で自動的に連続再生されます。</li>
+              <li>画面下のプレイヤーバーで再生位置のシーク、5秒巻き戻し/早送り、速度変更が可能です。</li>
+            </ol>
+          </section>
+
+          <section>
+            <h4>⌨️ キーボードショートカット</h4>
+            <div class="shortcut-list">
+              <div class="shortcut-row"><kbd>Space</kbd> <span>再生 / 一時停止</span></div>
+              <div class="shortcut-row"><kbd>←</kbd> <span>5秒 巻き戻し</span></div>
+              <div class="shortcut-row"><kbd>→</kbd> <span>5秒 早送り</span></div>
+              <div class="shortcut-row"><kbd>↑</kbd> / <kbd>↓</kbd> <span>音量調整</span></div>
+              <div class="shortcut-row"><kbd>N</kbd> <span>次の曲へスキップ</span></div>
+              <div class="shortcut-row"><kbd>P</kbd> <span>前の曲へ</span></div>
+              <div class="shortcut-row"><kbd>R</kbd> <span>リピートモード切り替え</span></div>
+            </div>
+          </section>
+
+          <section>
+            <h4>💡 学習・反復練習のコツ</h4>
+            <p>聞き取れなかったり詰まったりした時は <kbd>←</kbd> (5秒戻る) を押すことで、素早く頭出ししてリピート練習できます。また、慣れてきたら速度を <code>1.1x</code>〜<code>1.25x</code> に上げるとリスニングの瞬発力向上に役立ちます。</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
